@@ -1,12 +1,17 @@
 import telebot
 from telebot import types
 import sqlite3
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # ===== CONFIG =====
-TOKEN = "SENING_BOT_TOKENING"  # <-- bot tokeningiz
-ADMIN = 1896321851  # <-- admin ID
-CHANNELS = ["@shokh_vss", "@shokh_news"]  # <-- majburi obuna kanallari
-GROUPS = ["@shokh_group", "@shokh_chat"]  # <-- majburi obuna guruhlari
+TOKEN = os.getenv("BOT_TOKEN", "SENING_BOT_TOKENING")
+ADMIN = 1896321851
+CHANNELS = ["@shokh_vss", "@shokh_news"]
+GROUPS = ["@shokh_group", "@shokh_chat"]
 
 # ===== DATABASE =====
 conn = sqlite3.connect("startup.db", check_same_thread=False)
@@ -22,21 +27,27 @@ CREATE TABLE IF NOT EXISTS users(
     premium INTEGER DEFAULT 0,
     invited_count INTEGER DEFAULT 0
 )
-""")
+"""
+)
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS invites(
     invited_user INTEGER UNIQUE,
     inviter INTEGER
 )
-""")
+"""
+)
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS logs(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER,
     action TEXT
 )
-""")
+"""
+)
 conn.commit()
+
+# ===== INITIALIZE BOT =====
+bot = telebot.TeleBot(TOKEN)
 
 # ===== HELPERS =====
 def log(uid, action):
@@ -47,12 +58,13 @@ def get_user(uid):
     cursor.execute("SELECT * FROM users WHERE user_id=?",(uid,))
     return cursor.fetchone()
 
+
 def add_user(uid, ref=None):
     if not get_user(uid):
         cursor.execute("INSERT INTO users(user_id, invited_by) VALUES(?,?)",(uid,ref))
         conn.commit()
         if ref and ref != uid:
-            cursor.execute("SELECT * FROM invites WHERE invited_user=?", (uid,))
+            cursor.execute("SELECT * FROM invites WHERE invited_user=?, (uid,)
             if not cursor.fetchone():
                 cursor.execute("INSERT INTO invites VALUES(?,?)",(uid,ref))
                 cursor.execute("UPDATE users SET points=points+1, coins=coins+1, referrals=referrals+1 WHERE user_id=?",(ref,))
@@ -80,7 +92,7 @@ def join_menu(uid):
     for ch in CHANNELS + GROUPS:
         kb.add(types.InlineKeyboardButton(f"📢 {ch}", url=f"https://t.me/{ch.replace('@','')}"))
     kb.add(types.InlineKeyboardButton("✅ Tekshirish", callback_data="check"))
-    bot.send_message(uid, "❌ Iltimos, majburiy obunaga a'zo bo‘ling:", reply_markup=kb)
+    bot.send_message(uid, "❌ Iltimos, majburiy obunaga a'zo bo'ling:", reply_markup=kb)
 
 def menu(uid):
     kb = types.InlineKeyboardMarkup(row_width=2)
@@ -124,5 +136,11 @@ def cb(c):
     if c.data == "check":
         if check_sub(uid):
             bot.send_message(uid, "✅ Obuna tekshiruvi muvaffaqiyatli!")
+            menu(uid)
         else:
-            bot.send_message(uid, "❌ Siz hali barcha maj
+            bot.send_message(uid, "❌ Siz hali barcha majburiy obunalarga a'zo bo'lmagansiz!")
+
+# ===== RUN BOT =====
+if __name__ == '__main__':
+    print("🤖 Bot ishga tushdi...")
+    bot.infinity_polling()
